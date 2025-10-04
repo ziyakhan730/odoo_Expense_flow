@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Bell, LogOut, Menu, User } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { apiService } from "@/services/api";
+import { toast } from "sonner";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -26,6 +28,23 @@ interface DashboardLayoutProps {
 
 const DashboardLayout = ({ children, role, navItems }: DashboardLayoutProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await apiService.logout();
+      toast.success("Logged out successfully!");
+      navigate("/auth");
+    } catch (error: any) {
+      toast.error("Logout failed. Please try again.");
+      console.error('Logout error:', error);
+      // Even if logout fails, clear local storage and redirect
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('user');
+      navigate("/auth");
+    }
+  };
 
   const getRoleBadge = () => {
     const variants = {
@@ -73,9 +92,9 @@ const DashboardLayout = ({ children, role, navItems }: DashboardLayoutProps) => 
                   Profile
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-destructive">
+                <DropdownMenuItem className="text-destructive" onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
-                  <Link to="/auth">Log out</Link>
+                  Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

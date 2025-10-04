@@ -35,6 +35,9 @@ const Landing = () => {
             <Link to="/auth">
               <Button variant="ghost">Sign In</Button>
             </Link>
+            <Link to="/company-registration">
+              <Button variant="outline">Register Company</Button>
+            </Link>
             <Link to="/auth">
               <Button>Get Started</Button>
             </Link>
@@ -62,15 +65,17 @@ const Landing = () => {
               Streamline expense management from submission to payment.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/auth">
+              <Link to="/company-registration">
                 <Button size="lg" variant="hero" className="w-full sm:w-auto shadow-glow">
-                  Get Started Free
+                  Register Your Company
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Button size="lg" variant="outline" className="w-full sm:w-auto">
-                Watch Demo
-              </Button>
+              <Link to="/auth">
+                <Button size="lg" variant="outline" className="w-full sm:w-auto">
+                  Sign In
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -205,9 +210,9 @@ const Landing = () => {
           <p className="text-lg text-primary-foreground/95 max-w-2xl mx-auto drop-shadow">
             Join thousands of companies that trust ExpenseFlow for their reimbursement workflows
           </p>
-          <Link to="/auth">
+          <Link to="/company-registration">
             <Button size="lg" variant="secondary" className="shadow-glow">
-              Start Free Trial
+              Register Your Company
               <ArrowRight className="ml-2 h-5 w-5" />
             </Button>
           </Link>
