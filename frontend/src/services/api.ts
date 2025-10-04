@@ -520,6 +520,18 @@ class ApiService {
       throw error;
     }
   }
+
+  async getAdminDashboardData(): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/admin-dashboard/`, {
+        method: 'GET',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching admin dashboard data:', error);
+      throw error;
+    }
+  }
 }
 
 export const apiService = new ApiService();

@@ -655,6 +655,111 @@ def get_manager_dashboard_data(request):
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
+def get_admin_dashboard_data(request):
+    """
+    API endpoint for admins to get comprehensive dashboard data
+    """
+    if request.user.role != 'admin':
+        return Response({'error': 'Only admins can access dashboard data'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Get all expenses from the admin's company
+    all_expenses = Expense.objects.filter(company=request.user.company)
+    
+    # Calculate basic statistics
+    total_users = User.objects.filter(company=request.user.company).count()
+    total_expenses_count = all_expenses.count()
+    pending_approvals = all_expenses.filter(status='pending').count()
+    
+    # Calculate monthly expenses (excluding rejected bills)
+    from django.utils import timezone
+    from datetime import timedelta
+    current_month = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    monthly_expenses = all_expenses.filter(
+        submission_date__gte=current_month
+    ).exclude(status='rejected')  # Exclude rejected bills from monthly expenses
+    monthly_total = sum(expense.amount for expense in monthly_expenses)
+    
+    # Calculate approval metrics
+    approved_count = all_expenses.filter(status='approved').count()
+    rejected_count = all_expenses.filter(status='rejected').count()
+    total_processed = approved_count + rejected_count
+    
+    approval_rate = (approved_count / total_processed * 100) if total_processed > 0 else 0
+    rejection_rate = (rejected_count / total_processed * 100) if total_processed > 0 else 0
+    
+    # Calculate average processing time
+    processed_expenses = all_expenses.filter(
+        status__in=['approved', 'rejected'],
+        approved_at__isnull=False
+    )
+    
+    avg_processing_days = 0
+    if processed_expenses.exists():
+        total_days = 0
+        for expense in processed_expenses:
+            if expense.approved_at:
+                days_diff = (expense.approved_at - expense.submission_date).days
+                total_days += days_diff
+        avg_processing_days = total_days / processed_expenses.count()
+    
+    # Get expenses by category (excluding rejected bills)
+    from django.db.models import Sum, Count
+    category_data = all_expenses.exclude(status='rejected').values('category__name').annotate(
+        total_amount=Sum('amount'),
+        count=Count('id')
+    ).order_by('-total_amount')
+    
+    # Calculate percentages
+    total_category_amount = sum(item['total_amount'] or 0 for item in category_data)
+    expenses_by_category = []
+    for item in category_data:
+        amount = item['total_amount'] or 0
+        percentage = (amount / total_category_amount * 100) if total_category_amount > 0 else 0
+        expenses_by_category.append({
+            'category': item['category__name'] or 'Uncategorized',
+            'amount': amount,
+            'percentage': round(percentage, 1),
+            'count': item['count']
+        })
+    
+    # Get recent users (last 30 days)
+    thirty_days_ago = timezone.now() - timedelta(days=30)
+    recent_users = User.objects.filter(
+        company=request.user.company,
+        date_joined__gte=thirty_days_ago
+    ).count()
+    
+    # Calculate growth percentages (mock data for now - can be enhanced with historical data)
+    user_growth = 12  # Mock percentage
+    expense_growth = 8.2  # Mock percentage
+    approval_change = -15  # Mock percentage
+    processing_change = -22  # Mock percentage
+    
+    # Calculate rejected bills amount (for reference, not included in monthly expenses)
+    rejected_expenses = all_expenses.filter(status='rejected')
+    rejected_amount = sum(expense.amount for expense in rejected_expenses)
+    
+    return Response({
+        'total_users': total_users,
+        'monthly_expenses': monthly_total,  # Excludes rejected bills
+        'pending_approvals': pending_approvals,
+        'avg_processing_time': round(avg_processing_days, 1),
+        'approval_rate': round(approval_rate, 1),
+        'rejection_rate': round(rejection_rate, 1),
+        'total_processed': total_processed,
+        'expenses_by_category': expenses_by_category,  # Excludes rejected bills
+        'user_growth': user_growth,
+        'expense_growth': expense_growth,
+        'approval_change': approval_change,
+        'processing_change': processing_change,
+        'recent_users': recent_users,
+        'total_expenses_count': total_expenses_count,
+        'rejected_amount': rejected_amount  # Separate metric for rejected bills
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
 def get_manager_approval_history(request):
     """
     API endpoint for managers to get approval history with filtering

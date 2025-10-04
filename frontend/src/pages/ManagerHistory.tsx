@@ -9,9 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { 
   CheckCircle, XCircle, Clock, Search, Filter, Eye, 
   Calendar, User, DollarSign, FileText, ChevronLeft, ChevronRight,
-  Download, RefreshCw
+  Download, RefreshCw, FileSpreadsheet
 } from 'lucide-react';
 import { apiService } from '../services/api';
+import { toast } from 'sonner';
 
 interface Expense {
   id: number;
@@ -55,6 +56,8 @@ const ManagerHistory: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exportLoading, setExportLoading] = useState(false);
   
   // Filter states
   const [filters, setFilters] = useState({
@@ -169,6 +172,96 @@ const ManagerHistory: React.FC = () => {
     setFilters(prev => ({ ...prev, page: newPage }));
   };
 
+  const exportToExcel = async (exportType: 'all' | 'approved' | 'pending' | 'rejected') => {
+    try {
+      setExportLoading(true);
+      
+      // Prepare filters for export
+      const exportFilters = {
+        ...filters,
+        status: exportType === 'all' ? '' : exportType,
+        page: 1,
+        page_size: 1000 // Get all records for export
+      };
+      
+      // Fetch data for export
+      const data = await apiService.getManagerApprovalHistory(exportFilters);
+      
+      // Generate Excel file
+      const excelData = generateExcelData(data.expenses, exportType);
+      downloadExcelFile(excelData, exportType);
+      
+      // Show success message
+      toast.success(`Exported ${data.expenses.length} ${exportType} expenses successfully!`);
+      
+      setExportDialogOpen(false);
+    } catch (err: any) {
+      console.error('Export error:', err);
+      toast.error('Failed to export data. Please try again.');
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const generateExcelData = (expenses: Expense[], exportType: string) => {
+    const headers = [
+      'ID',
+      'Title',
+      'Description',
+      'Amount',
+      'Currency',
+      'Status',
+      'Priority',
+      'Employee',
+      'Expense Date',
+      'Submission Date',
+      'Category',
+      'Approved By',
+      'Approved At',
+      'Rejection Reason'
+    ];
+
+    const rows = expenses.map(expense => [
+      expense.id,
+      expense.title,
+      expense.description || '',
+      expense.amount,
+      expense.currency,
+      expense.status,
+      expense.priority,
+      expense.user_name,
+      new Date(expense.expense_date).toLocaleDateString(),
+      new Date(expense.submission_date).toLocaleDateString(),
+      expense.category?.name || '',
+      expense.approved_by_name || '',
+      expense.approved_at ? new Date(expense.approved_at).toLocaleDateString() : '',
+      expense.rejection_reason || ''
+    ]);
+
+    return [headers, ...rows];
+  };
+
+  const downloadExcelFile = (data: any[][], exportType: string) => {
+    // Create CSV content (Excel can open CSV files)
+    const csvContent = data.map(row => 
+      row.map(cell => `"${cell}"`).join(',')
+    ).join('\n');
+
+    // Add BOM for UTF-8 support
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    
+    // Create download link
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `expense_history_${exportType}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -193,9 +286,14 @@ const ManagerHistory: React.FC = () => {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button variant="outline" size="sm">
-            <Download className="h-4 w-4 mr-2" />
-            Export
+          <Button 
+            onClick={() => setExportDialogOpen(true)} 
+            variant="outline" 
+            size="sm"
+            disabled={exportLoading}
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            {exportLoading ? 'Exporting...' : 'Export'}
           </Button>
         </div>
       </div>
@@ -497,6 +595,83 @@ const ManagerHistory: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Export Dialog */}
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="h-5 w-5" />
+              Export Expense History
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Choose which expenses to export to Excel format:
+            </p>
+            <div className="grid gap-3">
+              <Button
+                onClick={() => exportToExcel('all')}
+                variant="outline"
+                className="justify-start h-12"
+                disabled={exportLoading}
+              >
+                <FileText className="h-4 w-4 mr-3" />
+                <div className="text-left">
+                  <div className="font-medium">All Expenses</div>
+                  <div className="text-sm text-gray-500">Export all expense records</div>
+                </div>
+              </Button>
+              
+              <Button
+                onClick={() => exportToExcel('approved')}
+                variant="outline"
+                className="justify-start h-12"
+                disabled={exportLoading}
+              >
+                <CheckCircle className="h-4 w-4 mr-3 text-green-600" />
+                <div className="text-left">
+                  <div className="font-medium">Approved Expenses</div>
+                  <div className="text-sm text-gray-500">Export only approved expenses</div>
+                </div>
+              </Button>
+              
+              <Button
+                onClick={() => exportToExcel('pending')}
+                variant="outline"
+                className="justify-start h-12"
+                disabled={exportLoading}
+              >
+                <Clock className="h-4 w-4 mr-3 text-yellow-600" />
+                <div className="text-left">
+                  <div className="font-medium">Pending Expenses</div>
+                  <div className="text-sm text-gray-500">Export only pending expenses</div>
+                </div>
+              </Button>
+              
+              <Button
+                onClick={() => exportToExcel('rejected')}
+                variant="outline"
+                className="justify-start h-12"
+                disabled={exportLoading}
+              >
+                <XCircle className="h-4 w-4 mr-3 text-red-600" />
+                <div className="text-left">
+                  <div className="font-medium">Rejected Expenses</div>
+                  <div className="text-sm text-gray-500">Export only rejected expenses</div>
+                </div>
+              </Button>
+            </div>
+            
+            {exportLoading && (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-sm text-gray-600">Preparing export...</span>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -37,4 +37,5 @@ urlpatterns = [
     path('my-expenses/', views.get_my_expenses, name='my-expenses'),
     path('manager-dashboard/', views.get_manager_dashboard_data, name='manager-dashboard'),
     path('manager-history/', views.get_manager_approval_history, name='manager-history'),
+    path('admin-dashboard/', views.get_admin_dashboard_data, name='admin-dashboard'),
 ]
