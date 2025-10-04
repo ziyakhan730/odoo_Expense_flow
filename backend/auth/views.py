@@ -611,6 +611,48 @@ def get_my_expenses(request):
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
+def get_employee_dashboard_data(request):
+    """
+    API endpoint for employees to get dashboard summary data
+    """
+    if request.user.role != 'employee':
+        return Response({'error': 'Only employees can access dashboard data'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Get all expenses from the employee
+    all_expenses = Expense.objects.filter(user=request.user)
+    
+    # Calculate statistics
+    total_submitted = sum(expense.amount for expense in all_expenses)
+    pending_amount = sum(expense.amount for expense in all_expenses.filter(status='pending'))
+    approved_amount = sum(expense.amount for expense in all_expenses.filter(status='approved'))
+    rejected_amount = sum(expense.amount for expense in all_expenses.filter(status='rejected'))
+    
+    # Get recent expenses (last 5)
+    recent_expenses = all_expenses[:5]
+    
+    # Calculate counts
+    pending_count = all_expenses.filter(status='pending').count()
+    approved_count = all_expenses.filter(status='approved').count()
+    rejected_count = all_expenses.filter(status='rejected').count()
+    
+    # Serialize recent expenses
+    recent_expenses_serializer = ExpenseSerializer(recent_expenses, many=True)
+    
+    return Response({
+        'total_submitted': total_submitted,
+        'pending_amount': pending_amount,
+        'approved_amount': approved_amount,
+        'rejected_amount': rejected_amount,
+        'pending_count': pending_count,
+        'approved_count': approved_count,
+        'rejected_count': rejected_count,
+        'recent_expenses': recent_expenses_serializer.data,
+        'total_expenses': all_expenses.count()
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
 def get_manager_dashboard_data(request):
     """
     API endpoint for managers to get dashboard summary data

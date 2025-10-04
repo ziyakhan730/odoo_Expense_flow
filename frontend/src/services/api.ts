@@ -601,6 +601,95 @@ class ApiService {
       throw error;
     }
   }
+
+  // Approval Management Methods
+  async getPendingApprovalsWorkflow(): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/expenses/pending/`);
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching pending approvals:', error);
+      throw error;
+    }
+  }
+
+  async approveExpenseWorkflow(expenseId: number, data: { comment?: string }): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/expenses/${expenseId}/approve-workflow/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error approving expense:', error);
+      throw error;
+    }
+  }
+
+  async rejectExpenseWorkflow(expenseId: number, data: { comment?: string }): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/expenses/${expenseId}/reject-workflow/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error rejecting expense:', error);
+      throw error;
+    }
+  }
+
+  async adminOverrideExpense(expenseId: number, data: { action: string; comment?: string }): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/expenses/${expenseId}/override/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error overriding expense:', error);
+      throw error;
+    }
+  }
+
+  async getExpenseHistory(filters?: { status?: string; date_from?: string; date_to?: string }): Promise<any> {
+    try {
+      const params = new URLSearchParams();
+      if (filters?.status) params.append('status', filters.status);
+      if (filters?.date_from) params.append('date_from', filters.date_from);
+      if (filters?.date_to) params.append('date_to', filters.date_to);
+      
+      const queryString = params.toString();
+      const url = queryString ? `${API_BASE_URL}/auth/expenses/history/?${queryString}` : `${API_BASE_URL}/auth/expenses/history/`;
+      
+      const response = await this.makeAuthenticatedRequest(url);
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching expense history:', error);
+      throw error;
+    }
+  }
+
+  // Employee Dashboard Methods
+  async getEmployeeDashboardData(): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/employee-dashboard/`);
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching employee dashboard data:', error);
+      throw error;
+    }
+  }
+
 }
 
 export const apiService = new ApiService();
