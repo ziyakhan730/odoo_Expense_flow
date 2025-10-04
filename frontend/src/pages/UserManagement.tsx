@@ -391,14 +391,6 @@ const UserManagement = () => {
         </div>
       </div>
 
-      {/* Debug Info */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mb-4 p-4 bg-gray-100 rounded-lg">
-          <h4 className="font-semibold mb-2">Debug Info:</h4>
-          <p>UserSets count: {Array.isArray(userSets) ? userSets.length : 'Not an array'}</p>
-          <p>UserSets data: {JSON.stringify(userSets, null, 2)}</p>
-        </div>
-      )}
 
       {/* User Sets Display */}
       <div className="grid gap-6">
