@@ -3,7 +3,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import User, Company, UserSet
+from .models import User, Company, UserSet, Expense, ExpenseCategory, Receipt
 
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -284,3 +284,93 @@ class UserSetUpdateSerializer(serializers.Serializer):
                 raise serializers.ValidationError("The target set already has a manager.")
         
         return attrs
+
+
+# Expense Management Serializers
+class ExpenseCategorySerializer(serializers.ModelSerializer):
+    """Serializer for expense categories"""
+    class Meta:
+        model = ExpenseCategory
+        fields = ['id', 'name', 'description', 'is_active', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class ReceiptSerializer(serializers.ModelSerializer):
+    """Serializer for receipt information"""
+    class Meta:
+        model = Receipt
+        fields = ['id', 'file', 'file_name', 'file_size', 'file_type', 'ocr_text', 
+                 'ocr_confidence', 'merchant_name', 'merchant_address', 'merchant_phone', 
+                 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class ExpenseSerializer(serializers.ModelSerializer):
+    """Serializer for expense information"""
+    category = ExpenseCategorySerializer(read_only=True)
+    category_id = serializers.IntegerField(write_only=True, required=False)
+    receipt = ReceiptSerializer(read_only=True)
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    approved_by_name = serializers.CharField(source='approved_by.get_full_name', read_only=True)
+    
+    class Meta:
+        model = Expense
+        fields = ['id', 'title', 'description', 'amount', 'currency', 'exchange_rate', 
+                 'base_amount', 'category', 'category_id', 'expense_date', 'status', 
+                 'priority', 'approved_by', 'approved_by_name', 'approved_at', 
+                 'rejection_reason', 'ocr_extracted_data', 'ai_confidence_score', 
+                 'is_ai_filled', 'tags', 'notes', 'user_name', 'receipt', 
+                 'submission_date', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'submission_date', 'created_at', 'updated_at', 
+                           'approved_by', 'approved_at', 'exchange_rate', 'base_amount']
+
+
+class ExpenseCreateSerializer(serializers.ModelSerializer):
+    """Serializer for creating expenses"""
+    category_id = serializers.IntegerField(required=False)
+    receipt_file = serializers.FileField(write_only=True, required=False)
+    
+    class Meta:
+        model = Expense
+        fields = ['title', 'description', 'amount', 'currency', 'expense_date', 
+                 'category_id', 'priority', 'tags', 'notes', 'receipt_file']
+    
+    def create(self, validated_data):
+        receipt_file = validated_data.pop('receipt_file', None)
+        category_id = validated_data.pop('category_id', None)
+        
+        # Set user and company from request context
+        user = self.context['request'].user
+        validated_data['user'] = user
+        validated_data['company'] = user.company
+        
+        # Set category if provided
+        if category_id:
+            try:
+                category = ExpenseCategory.objects.get(id=category_id, company=user.company)
+                validated_data['category'] = category
+            except ExpenseCategory.DoesNotExist:
+                raise serializers.ValidationError("Invalid category ID")
+        
+        # Create expense
+        expense = Expense.objects.create(**validated_data)
+        
+        # Handle receipt file if provided
+        if receipt_file:
+            Receipt.objects.create(
+                expense=expense,
+                file=receipt_file,
+                file_name=receipt_file.name,
+                file_size=receipt_file.size,
+                file_type=receipt_file.content_type
+            )
+        
+        return expense
+
+
+class OCRDataSerializer(serializers.Serializer):
+    """Serializer for OCR extracted data"""
+    text = serializers.CharField()
+    confidence = serializers.FloatField()
+    extracted_data = serializers.JSONField()
+    merchant_info = serializers.JSONField(required=False)

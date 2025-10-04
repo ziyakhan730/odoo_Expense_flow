@@ -20,4 +20,13 @@ urlpatterns = [
     path('users/<int:user_id>/set/', views.update_user_set, name='update-user-set'),
     path('managers/available/', views.get_available_managers, name='available-managers'),
     path('sets/<int:set_id>/users/', views.get_users_by_set, name='users-by-set'),
+    
+    # Expense Management endpoints
+    path('expenses/', views.expense_list_create, name='expense-list-create'),
+    path('expenses/<int:expense_id>/', views.expense_detail, name='expense-detail'),
+    path('expense-categories/', views.expense_categories, name='expense-categories'),
+    path('expense-categories/<int:category_id>/', views.expense_category_detail, name='expense-category-detail'),
+    path('receipts/ocr/', views.process_receipt_ocr, name='process-receipt-ocr'),
+    path('countries-currencies/', views.get_countries_currencies, name='countries-currencies'),
+    path('exchange-rates/', views.get_exchange_rates, name='exchange-rates'),
 ]

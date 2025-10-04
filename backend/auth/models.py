@@ -1,6 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import RegexValidator
+from django.core.validators import MinValueValidator
+from decimal import Decimal
 
 
 class Company(models.Model):
@@ -86,3 +88,117 @@ class User(AbstractUser):
     class Meta:
         verbose_name = "User"
         verbose_name_plural = "Users"
+
+
+class ExpenseCategory(models.Model):
+    """Expense category model"""
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='expense_categories')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return self.name
+    
+    class Meta:
+        verbose_name = "Expense Category"
+        verbose_name_plural = "Expense Categories"
+
+
+class Expense(models.Model):
+    """Expense model for storing expense information"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('under_review', 'Under Review'),
+    ]
+    
+    PRIORITY_CHOICES = [
+        ('low', 'Low'),
+        ('medium', 'Medium'),
+        ('high', 'High'),
+        ('urgent', 'Urgent'),
+    ]
+    
+    # Basic Information
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='expenses')
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='expenses')
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, null=True)
+    
+    # Financial Information
+    amount = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(Decimal('0.01'))])
+    currency = models.CharField(max_length=3, default='USD')  # ISO currency code
+    exchange_rate = models.DecimalField(max_digits=10, decimal_places=6, null=True, blank=True)
+    base_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # Amount in company's base currency
+    
+    # Categorization
+    category = models.ForeignKey(ExpenseCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='expenses')
+    
+    # Dates
+    expense_date = models.DateField()
+    submission_date = models.DateTimeField(auto_now_add=True)
+    
+    # Status and Approval
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
+    
+    # Approval Information
+    approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_expenses')
+    approved_at = models.DateTimeField(null=True, blank=True)
+    rejection_reason = models.TextField(blank=True, null=True)
+    
+    # OCR and AI Information
+    ocr_extracted_data = models.JSONField(null=True, blank=True)  # Store OCR extracted data
+    ai_confidence_score = models.FloatField(null=True, blank=True)  # AI confidence score
+    is_ai_filled = models.BooleanField(default=False)  # Whether data was auto-filled by AI
+    
+    # Additional Information
+    tags = models.JSONField(default=list, blank=True)  # Store tags as JSON array
+    notes = models.TextField(blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.title} - {self.amount} {self.currency}"
+    
+    class Meta:
+        verbose_name = "Expense"
+        verbose_name_plural = "Expenses"
+        ordering = ['-submission_date']
+
+
+class Receipt(models.Model):
+    """Receipt model for storing receipt information and files"""
+    expense = models.OneToOneField(Expense, on_delete=models.CASCADE, related_name='receipt')
+    
+    # File Information
+    file = models.FileField(upload_to='receipts/%Y/%m/%d/')
+    file_name = models.CharField(max_length=255)
+    file_size = models.PositiveIntegerField()  # Size in bytes
+    file_type = models.CharField(max_length=100)  # MIME type
+    
+    # OCR Information
+    ocr_text = models.TextField(blank=True, null=True)  # Raw OCR text
+    ocr_confidence = models.FloatField(null=True, blank=True)  # OCR confidence score
+    ocr_processed_at = models.DateTimeField(null=True, blank=True)
+    
+    # Extracted Information
+    merchant_name = models.CharField(max_length=200, blank=True, null=True)
+    merchant_address = models.TextField(blank=True, null=True)
+    merchant_phone = models.CharField(max_length=50, blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Receipt for {self.expense.title}"
+    
+    class Meta:
+        verbose_name = "Receipt"
+        verbose_name_plural = "Receipts"
