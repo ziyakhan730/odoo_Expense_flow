@@ -133,3 +133,29 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  /* Ensure proper responsive behavior for header elements */
+  .header-container {
+    @apply w-full max-w-none;
+  }
+  
+  /* Prevent elements from being pushed inward on small screens */
+  .header-content {
+    @apply flex items-center justify-between w-full;
+  }
+  
+  /* Responsive spacing for header elements */
+  .header-left {
+    @apply flex items-center gap-2 sm:gap-4 flex-shrink-0;
+  }
+  
+  .header-right {
+    @apply flex items-center gap-2 sm:gap-4 flex-shrink-0;
+  }
+  
+  /* Ensure proper text sizing across breakpoints */
+  .logo-text {
+    @apply font-bold text-lg sm:text-xl whitespace-nowrap;
+  }
+}
