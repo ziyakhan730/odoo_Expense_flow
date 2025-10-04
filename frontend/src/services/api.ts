@@ -277,6 +277,139 @@ class ApiService {
 
     return response.json();
   }
+
+  // Expense Management APIs
+  async getExpenses() {
+    const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/expenses/`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch expenses');
+    }
+
+    return response.json();
+  }
+
+  async createExpense(data: FormData) {
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(`${API_BASE_URL}/auth/expenses/`, {
+      method: 'POST',
+      headers: {
+        ...(token && { 'Authorization': `Bearer ${token}` }),
+        // Don't set Content-Type for FormData - let browser set it with boundary
+      },
+      body: data,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create expense');
+    }
+
+    return response.json();
+  }
+
+  async getExpenseCategories() {
+    const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/expense-categories/`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch expense categories');
+    }
+
+    return response.json();
+  }
+
+  async processReceiptOCR(file: FormData) {
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(`${API_BASE_URL}/auth/receipts/ocr/`, {
+      method: 'POST',
+      headers: {
+        ...(token && { 'Authorization': `Bearer ${token}` }),
+        // Don't set Content-Type for FormData - let browser set it with boundary
+      },
+      body: file,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to process receipt OCR');
+    }
+
+    return response.json();
+  }
+
+  async getCountriesCurrencies() {
+    const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/countries-currencies/`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch countries and currencies');
+    }
+
+    return response.json();
+  }
+
+  async getExchangeRates() {
+    const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/exchange-rates/`, {
+      method: 'GET',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to fetch exchange rates');
+    }
+
+    return response.json();
+  }
+
+  // Expense Category Management APIs
+  async createExpenseCategory(data: { name: string; description?: string }) {
+    const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/expense-categories/`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to create expense category');
+    }
+
+    return response.json();
+  }
+
+  async updateExpenseCategory(categoryId: number, data: { name: string; description?: string; is_active?: boolean }) {
+    const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/expense-categories/${categoryId}/`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to update expense category');
+    }
+
+    return response.json();
+  }
+
+  async deleteExpenseCategory(categoryId: number) {
+    const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/expense-categories/${categoryId}/`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete expense category');
+    }
+
+    return true;
+  }
 }
 
 export const apiService = new ApiService();

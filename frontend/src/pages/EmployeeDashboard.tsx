@@ -2,24 +2,20 @@ import DashboardLayout from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   LayoutDashboard, 
   Upload, 
   History, 
   User,
-  Plus,
   DollarSign,
   Clock,
   CheckCircle2,
   XCircle
 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { Routes, Route } from "react-router-dom";
+import ExpenseSubmission from "./ExpenseSubmission";
 
 const navItems = [
   { label: "Dashboard", path: "/employee", icon: LayoutDashboard },
@@ -35,14 +31,7 @@ const mockExpenses = [
   { id: 4, amount: 45, currency: "USD", category: "Office", date: "2024-01-12", status: "approved", description: "Office supplies" },
 ];
 
-const EmployeeDashboard = () => {
-  const [showSubmitForm, setShowSubmitForm] = useState(false);
-
-  const handleSubmitExpense = (e: React.FormEvent) => {
-    e.preventDefault();
-    toast.success("Expense submitted successfully!");
-    setShowSubmitForm(false);
-  };
+const EmployeeOverview = () => {
 
   const getStatusBadge = (status: string) => {
     const variants = {
@@ -61,18 +50,13 @@ const EmployeeDashboard = () => {
   ];
 
   return (
-    <DashboardLayout role="employee" navItems={navItems}>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Employee Dashboard</h1>
-            <p className="text-muted-foreground">Manage your expense claims</p>
-          </div>
-          <Button onClick={() => setShowSubmitForm(true)} size="lg">
-            <Plus className="mr-2 h-4 w-4" />
-            Submit Expense
-          </Button>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Employee Dashboard</h1>
+          <p className="text-muted-foreground">Manage your expense claims</p>
         </div>
+      </div>
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
@@ -92,81 +76,6 @@ const EmployeeDashboard = () => {
           })}
         </div>
 
-        {/* Submit Form */}
-        {showSubmitForm && (
-          <Card className="border-2 border-primary">
-            <CardHeader>
-              <CardTitle>Submit New Expense</CardTitle>
-              <CardDescription>Fill in the details and upload your receipt</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmitExpense} className="space-y-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="amount">Amount</Label>
-                    <Input id="amount" type="number" placeholder="0.00" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="currency">Currency</Label>
-                    <Select defaultValue="usd" required>
-                      <SelectTrigger id="currency">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="usd">USD - US Dollar</SelectItem>
-                        <SelectItem value="eur">EUR - Euro</SelectItem>
-                        <SelectItem value="gbp">GBP - British Pound</SelectItem>
-                        <SelectItem value="jpy">JPY - Japanese Yen</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Category</Label>
-                    <Select required>
-                      <SelectTrigger id="category">
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="travel">Travel</SelectItem>
-                        <SelectItem value="meals">Meals</SelectItem>
-                        <SelectItem value="hotel">Hotel</SelectItem>
-                        <SelectItem value="office">Office Supplies</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="date">Date</Label>
-                    <Input id="date" type="date" required />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" placeholder="Brief description of the expense" required />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="receipt">Receipt Upload (OCR enabled)</Label>
-                  <Input id="receipt" type="file" accept="image/*" />
-                  <p className="text-xs text-muted-foreground">
-                    Upload a photo of your receipt. Our AI will auto-fill the details.
-                  </p>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button type="submit" className="flex-1">Submit Expense</Button>
-                  <Button type="button" variant="outline" onClick={() => setShowSubmitForm(false)}>
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Expense History */}
         <Card>
@@ -202,7 +111,19 @@ const EmployeeDashboard = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
+    </div>
+  );
+};
+
+const EmployeeDashboard = () => {
+  return (
+    <DashboardLayout role="employee" navItems={navItems}>
+      <Routes>
+        <Route path="/" element={<EmployeeOverview />} />
+        <Route path="/submit" element={<ExpenseSubmission />} />
+        <Route path="/history" element={<div>Expense History - Coming Soon</div>} />
+        <Route path="/profile" element={<div>Profile - Coming Soon</div>} />
+      </Routes>
     </DashboardLayout>
   );
 };

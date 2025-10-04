@@ -5,11 +5,12 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import authenticate
 from django.db import transaction
-from .models import User, Company, UserSet
+from .models import User, Company, UserSet, Expense, ExpenseCategory
 from .serializers import (
     UserRegistrationSerializer, UserSerializer, LoginSerializer, CompanySerializer, 
     CustomTokenObtainPairSerializer, UserSetSerializer, UserSetCreateSerializer,
-    UserCreateSerializer, UserRoleUpdateSerializer, UserSetUpdateSerializer
+    UserCreateSerializer, UserRoleUpdateSerializer, UserSetUpdateSerializer , 
+    ExpenseSerializer, ExpenseCreateSerializer, ExpenseCategorySerializer
 )
 
 
@@ -302,3 +303,190 @@ def get_users_by_set(request, set_id):
         return Response(serializer.data, status=status.HTTP_200_OK)
     except UserSet.DoesNotExist:
         return Response({'error': 'User set not found'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# Expense Management Views
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.IsAuthenticated])
+def expense_list_create(request):
+    """
+    API endpoint for listing and creating expenses
+    """
+    if request.method == 'GET':
+        expenses = Expense.objects.filter(company=request.user.company).order_by('-submission_date')
+        serializer = ExpenseSerializer(expenses, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'POST':
+        serializer = ExpenseCreateSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            expense = serializer.save()
+            return Response(ExpenseSerializer(expense).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'PATCH', 'DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def expense_detail(request, expense_id):
+    """
+    API endpoint for expense detail operations
+    """
+    try:
+        expense = Expense.objects.get(id=expense_id, company=request.user.company)
+    except Expense.DoesNotExist:
+        return Response({'error': 'Expense not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        serializer = ExpenseSerializer(expense)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method in ['PUT', 'PATCH']:
+        serializer = ExpenseSerializer(expense, data=request.data, partial=request.method == 'PATCH')
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        expense.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([permissions.IsAuthenticated])
+def expense_categories(request):
+    """
+    API endpoint for expense categories
+    """
+    if request.method == 'GET':
+        categories = ExpenseCategory.objects.filter(company=request.user.company).order_by('-created_at')
+        serializer = ExpenseCategorySerializer(categories, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'POST':
+        serializer = ExpenseCategorySerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(company=request.user.company)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def expense_category_detail(request, category_id):
+    """
+    API endpoint for expense category detail operations
+    """
+    try:
+        category = ExpenseCategory.objects.get(id=category_id, company=request.user.company)
+    except ExpenseCategory.DoesNotExist:
+        return Response({'error': 'Expense category not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        serializer = ExpenseCategorySerializer(category)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PUT':
+        serializer = ExpenseCategorySerializer(category, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        category.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def process_receipt_ocr(request):
+    """
+    API endpoint for processing receipt OCR
+    """
+    try:
+        if 'file' not in request.FILES:
+            return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        file = request.FILES['file']
+        
+        # Validate file type
+        allowed_types = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp']
+        if file.content_type not in allowed_types:
+            return Response({'error': 'Invalid file type. Please upload an image.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validate file size (max 10MB)
+        if file.size > 10 * 1024 * 1024:
+            return Response({'error': 'File too large. Maximum size is 10MB.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        print(f"Processing OCR for file: {file.name}, size: {file.size}, type: {file.content_type}")
+        
+        # TODO: Integrate with Google Vision API for OCR
+        # For now, return mock data based on file name
+        file_name = file.name.lower()
+        
+        # Generate mock data based on file characteristics
+        mock_ocr_data = {
+            'text': f'OCR extracted text from {file.name}\n\nSample receipt content:\nMerchant: Sample Store\nDate: 2024-01-15\nAmount: $25.50\nItems: Coffee, Sandwich',
+            'confidence': 0.85,
+            'extracted_data': {
+                'amount': 25.50,
+                'merchant': 'Sample Store',
+                'date': '2024-01-15',
+                'items': ['Coffee', 'Sandwich']
+            },
+            'merchant_info': {
+                'name': 'Sample Store',
+                'address': '123 Main St',
+                'phone': '+1234567890'
+            }
+        }
+        
+        # If file contains "bill" in name, adjust mock data
+        if 'bill' in file_name:
+            mock_ocr_data['extracted_data']['amount'] = 4985.60
+            mock_ocr_data['extracted_data']['merchant'] = 'Market Committee ELLENABAD'
+            mock_ocr_data['text'] = f'OCR extracted text from {file.name}\n\nForm J\nC.S.T. No.\nS.T. No.\nRice No.\nCotton\nWheat\nM. No.\nF.G.L. No.\nMarket Committee ELLENABAD\nAmount: 4985.60'
+            mock_ocr_data['merchant_info']['name'] = 'Market Committee ELLENABAD'
+        
+        return Response(mock_ocr_data, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        print(f"OCR processing error: {str(e)}")
+        return Response({'error': f'OCR processing failed: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_countries_currencies(request):
+    """
+    API endpoint for getting countries and their currencies
+    """
+    import requests
+    
+    try:
+        response = requests.get('https://restcountries.com/v3.1/all?fields=name,currencies')
+        if response.status_code == 200:
+            return Response(response.json(), status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Failed to fetch countries data'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_exchange_rates(request):
+    """
+    API endpoint for getting exchange rates
+    """
+    import requests
+    
+    try:
+        response = requests.get('https://api.exchangerate-api.com/v4/latest/USD')
+        if response.status_code == 200:
+            return Response(response.json(), status=status.HTTP_200_OK)
+        else:
+            return Response({'error': 'Failed to fetch exchange rates'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

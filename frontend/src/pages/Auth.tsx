@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { apiService } from "@/services/api";
+import { ArrowLeft, Home } from "lucide-react";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -43,6 +44,18 @@ const Auth = () => {
 
   return (
     <div className="min-h-screen bg-gradient-hero flex items-center justify-center p-4">
+      {/* Back to Home Button */}
+      <div className="absolute top-4 left-4">
+        <Button
+          variant="outline"
+          onClick={() => navigate("/")}
+          className="bg-white/90 backdrop-blur-sm border-white/20 hover:bg-white hover:border-white/40"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Home
+        </Button>
+      </div>
+      
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
           <div className="h-12 w-12 rounded-lg bg-gradient-hero mx-auto mb-4" />
