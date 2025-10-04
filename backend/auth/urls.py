@@ -36,4 +36,5 @@ urlpatterns = [
     path('expenses/<int:expense_id>/reject/', views.reject_expense, name='reject-expense'),
     path('my-expenses/', views.get_my_expenses, name='my-expenses'),
     path('manager-dashboard/', views.get_manager_dashboard_data, name='manager-dashboard'),
+    path('manager-history/', views.get_manager_approval_history, name='manager-history'),
 ]

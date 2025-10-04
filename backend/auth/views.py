@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import authenticate
-from django.db import transaction
+from django.db import transaction, models
 from .models import User, Company, UserSet, Expense, ExpenseCategory
 from .serializers import (
     UserRegistrationSerializer, UserSerializer, LoginSerializer, CompanySerializer, 
@@ -650,4 +650,86 @@ def get_manager_dashboard_data(request):
         'today_approvals': today_approvals,
         'recent_approvals': recent_approvals_serializer.data,
         'total_expenses': all_expenses.count()
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_manager_approval_history(request):
+    """
+    API endpoint for managers to get approval history with filtering
+    """
+    if request.user.role != 'manager':
+        return Response({'error': 'Only managers can access approval history'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if not request.user.user_set:
+        return Response({'error': 'Manager is not assigned to any set'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Get query parameters for filtering
+    status_filter = request.GET.get('status', None)  # pending, approved, rejected
+    employee_filter = request.GET.get('employee', None)  # employee name or ID
+    date_from = request.GET.get('date_from', None)  # YYYY-MM-DD
+    date_to = request.GET.get('date_to', None)  # YYYY-MM-DD
+    search = request.GET.get('search', None)  # search in title/description
+    page = int(request.GET.get('page', 1))
+    page_size = int(request.GET.get('page_size', 20))
+    
+    # Get all expenses from users in the manager's set
+    expenses = Expense.objects.filter(
+        user__user_set=request.user.user_set
+    ).order_by('-submission_date')
+    
+    # Apply filters
+    if status_filter:
+        expenses = expenses.filter(status=status_filter)
+    
+    if employee_filter:
+        expenses = expenses.filter(
+            models.Q(user__first_name__icontains=employee_filter) |
+            models.Q(user__last_name__icontains=employee_filter) |
+            models.Q(user__username__icontains=employee_filter)
+        )
+    
+    if date_from:
+        expenses = expenses.filter(submission_date__date__gte=date_from)
+    
+    if date_to:
+        expenses = expenses.filter(submission_date__date__lte=date_to)
+    
+    if search:
+        expenses = expenses.filter(
+            models.Q(title__icontains=search) |
+            models.Q(description__icontains=search)
+        )
+    
+    # Calculate pagination
+    total_count = expenses.count()
+    start_index = (page - 1) * page_size
+    end_index = start_index + page_size
+    paginated_expenses = expenses[start_index:end_index]
+    
+    # Serialize expenses
+    serializer = ExpenseSerializer(paginated_expenses, many=True)
+    
+    # Calculate summary statistics
+    approved_count = expenses.filter(status='approved').count()
+    rejected_count = expenses.filter(status='rejected').count()
+    pending_count = expenses.filter(status='pending').count()
+    
+    return Response({
+        'expenses': serializer.data,
+        'pagination': {
+            'page': page,
+            'page_size': page_size,
+            'total_count': total_count,
+            'total_pages': (total_count + page_size - 1) // page_size,
+            'has_next': end_index < total_count,
+            'has_previous': page > 1
+        },
+        'summary': {
+            'total': total_count,
+            'approved': approved_count,
+            'rejected': rejected_count,
+            'pending': pending_count
+        }
     }, status=status.HTTP_200_OK)

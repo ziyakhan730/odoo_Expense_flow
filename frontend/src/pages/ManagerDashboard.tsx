@@ -9,6 +9,7 @@ import { apiService } from '../services/api';
 import { CheckCircle, XCircle, Eye, Clock, DollarSign, Calendar, User, FileText, LayoutDashboard, History } from 'lucide-react';
 import DashboardLayout from '../components/layout/DashboardLayout';
 import { Routes, Route } from 'react-router-dom';
+import ManagerHistory from './ManagerHistory';
 
 interface Expense {
   id: number;
@@ -209,8 +210,8 @@ const ManagerOverview: React.FC = () => {
       <div className="grid gap-6 md:grid-cols-2">
         {/* Recent Approvals */}
         {recentApprovals.length > 0 && (
-          <Card>
-            <CardHeader>
+        <Card>
+          <CardHeader>
               <CardTitle>Recent Approvals</CardTitle>
               <p className="text-sm text-muted-foreground">Latest approved expenses from your team</p>
           </CardHeader>
@@ -586,7 +587,7 @@ const ManagerDashboard: React.FC = () => {
       <Routes>
         <Route path="/" element={<ManagerOverview />} />
         <Route path="/approvals" element={<ExpenseApprovals />} />
-        <Route path="/history" element={<div>Approval History - Coming Soon</div>} />
+        <Route path="/history" element={<ManagerHistory />} />
       </Routes>
     </DashboardLayout>
   );

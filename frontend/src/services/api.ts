@@ -475,6 +475,37 @@ class ApiService {
       throw error;
     }
   }
+
+  async getManagerApprovalHistory(params: {
+    status?: string;
+    employee?: string;
+    date_from?: string;
+    date_to?: string;
+    search?: string;
+    page?: number;
+    page_size?: number;
+  } = {}): Promise<any> {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      if (params.status) queryParams.append('status', params.status);
+      if (params.employee) queryParams.append('employee', params.employee);
+      if (params.date_from) queryParams.append('date_from', params.date_from);
+      if (params.date_to) queryParams.append('date_to', params.date_to);
+      if (params.search) queryParams.append('search', params.search);
+      if (params.page) queryParams.append('page', params.page.toString());
+      if (params.page_size) queryParams.append('page_size', params.page_size.toString());
+      
+      const url = `${API_BASE_URL}/auth/manager-history${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const response = await this.makeAuthenticatedRequest(url, {
+        method: 'GET',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching manager approval history:', error);
+      throw error;
+    }
+  }
 }
 
 export const apiService = new ApiService();
