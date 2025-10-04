@@ -61,6 +61,12 @@ class ApiService {
       }
     }
 
+    // Check if response is HTML (error page) instead of JSON
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('text/html')) {
+      throw new Error(`Server returned HTML instead of JSON. Status: ${response.status}`);
+    }
+
     return response;
   }
 
@@ -349,8 +355,12 @@ class ApiService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch countries and currencies');
+      try {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch countries and currencies');
+      } catch (parseError) {
+        throw new Error(`Failed to fetch countries and currencies (${response.status})`);
+      }
     }
 
     return response.json();
@@ -362,8 +372,12 @@ class ApiService {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to fetch exchange rates');
+      try {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch exchange rates');
+      } catch (parseError) {
+        throw new Error(`Failed to fetch exchange rates (${response.status})`);
+      }
     }
 
     return response.json();

@@ -40,3 +40,17 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Sidebar Collapse Styles */
+.sidebar-collapsed .nav-item {
+  justify-content: center;
+  padding: 0.5rem;
+}
+
+.sidebar-collapsed .nav-item span {
+  display: none;
+}
+
+.sidebar-collapsed .nav-item .icon {
+  margin: 0;
+}

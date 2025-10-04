@@ -102,6 +102,19 @@ const ExpenseSubmission = () => {
 
   const loadInitialData = async () => {
     try {
+      // Check if user is authenticated first
+      if (!apiService.isAuthenticated()) {
+        toast.error('Please log in to access this page');
+        // Set some default data to prevent form from being completely broken
+        setCurrencies([
+          { code: 'USD', name: 'US Dollar', symbol: '$', country: 'United States' },
+          { code: 'EUR', name: 'Euro', symbol: '€', country: 'European Union' },
+          { code: 'GBP', name: 'British Pound', symbol: '£', country: 'United Kingdom' },
+        ]);
+        setCategories([]);
+        return;
+      }
+
       const [countriesData, exchangeRatesData, categoriesData] = await Promise.all([
         apiService.getCountriesCurrencies(),
         apiService.getExchangeRates(),
@@ -134,9 +147,23 @@ const ExpenseSubmission = () => {
       });
       setCurrencies(processedCurrencies.sort((a, b) => a.code.localeCompare(b.code)));
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading initial data:', error);
-      toast.error('Failed to load initial data');
+      if (error.message?.includes('HTML instead of JSON')) {
+        toast.error('Authentication error. Please log in again.');
+      } else if (error.message?.includes('401') || error.message?.includes('403')) {
+        toast.error('Please log in to access this page');
+      } else {
+        toast.error('Failed to load initial data');
+      }
+      
+      // Set fallback data to prevent form from being completely broken
+      setCurrencies([
+        { code: 'USD', name: 'US Dollar', symbol: '$', country: 'United States' },
+        { code: 'EUR', name: 'Euro', symbol: '€', country: 'European Union' },
+        { code: 'GBP', name: 'British Pound', symbol: '£', country: 'United Kingdom' },
+      ]);
+      setCategories([]);
     }
   };
 
