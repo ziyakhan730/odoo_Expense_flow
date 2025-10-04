@@ -490,3 +490,164 @@ def get_exchange_rates(request):
             return Response({'error': 'Failed to fetch exchange rates'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     except Exception as e:
         return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# Expense Approval Views
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_pending_approvals(request):
+    """
+    API endpoint for managers to get pending expense approvals from their set
+    """
+    if request.user.role != 'manager':
+        return Response({'error': 'Only managers can view pending approvals'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Get expenses from users in the manager's set that are pending approval
+    if not request.user.user_set:
+        return Response({'error': 'Manager is not assigned to any set'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    pending_expenses = Expense.objects.filter(
+        user__user_set=request.user.user_set,
+        status='pending'
+    ).order_by('-submission_date')
+    
+    serializer = ExpenseSerializer(pending_expenses, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def approve_expense(request, expense_id):
+    """
+    API endpoint for managers to approve an expense
+    """
+    if request.user.role != 'manager':
+        return Response({'error': 'Only managers can approve expenses'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        expense = Expense.objects.get(id=expense_id, company=request.user.company)
+    except Expense.DoesNotExist:
+        return Response({'error': 'Expense not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if the expense is from a user in the manager's set
+    if not request.user.user_set or expense.user.user_set != request.user.user_set:
+        return Response({'error': 'You can only approve expenses from users in your set'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Check if expense is pending
+    if expense.status != 'pending':
+        return Response({'error': 'Expense is not pending approval'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Approve the expense
+    from django.utils import timezone
+    expense.status = 'approved'
+    expense.approved_by = request.user
+    expense.approved_at = timezone.now()
+    expense.save()
+    
+    return Response({
+        'message': 'Expense approved successfully',
+        'expense': ExpenseSerializer(expense).data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def reject_expense(request, expense_id):
+    """
+    API endpoint for managers to reject an expense
+    """
+    if request.user.role != 'manager':
+        return Response({'error': 'Only managers can reject expenses'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        expense = Expense.objects.get(id=expense_id, company=request.user.company)
+    except Expense.DoesNotExist:
+        return Response({'error': 'Expense not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if the expense is from a user in the manager's set
+    if not request.user.user_set or expense.user.user_set != request.user.user_set:
+        return Response({'error': 'You can only reject expenses from users in your set'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Check if expense is pending
+    if expense.status != 'pending':
+        return Response({'error': 'Expense is not pending approval'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Get rejection reason from request
+    rejection_reason = request.data.get('rejection_reason', '')
+    if not rejection_reason:
+        return Response({'error': 'Rejection reason is required'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Reject the expense
+    from django.utils import timezone
+    expense.status = 'rejected'
+    expense.approved_by = request.user
+    expense.approved_at = timezone.now()
+    expense.rejection_reason = rejection_reason
+    expense.save()
+    
+    return Response({
+        'message': 'Expense rejected successfully',
+        'expense': ExpenseSerializer(expense).data
+    }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_my_expenses(request):
+    """
+    API endpoint for users to get their own expenses
+    """
+    expenses = Expense.objects.filter(user=request.user).order_by('-submission_date')
+    serializer = ExpenseSerializer(expenses, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_manager_dashboard_data(request):
+    """
+    API endpoint for managers to get dashboard summary data
+    """
+    if request.user.role != 'manager':
+        return Response({'error': 'Only managers can access dashboard data'}, status=status.HTTP_403_FORBIDDEN)
+    
+    if not request.user.user_set:
+        return Response({'error': 'Manager is not assigned to any set'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Get all expenses from users in the manager's set
+    all_expenses = Expense.objects.filter(
+        user__user_set=request.user.user_set
+    ).order_by('-submission_date')
+    
+    # Calculate statistics
+    pending_count = all_expenses.filter(status='pending').count()
+    approved_count = all_expenses.filter(status='approved').count()
+    rejected_count = all_expenses.filter(status='rejected').count()
+    
+    # Get unique team members
+    team_members = User.objects.filter(user_set=request.user.user_set).count()
+    
+    # Get recent approvals (last 5 approved expenses)
+    recent_approvals = all_expenses.filter(status='approved')[:5]
+    
+    # Get today's approvals
+    from django.utils import timezone
+    today = timezone.now().date()
+    today_approvals = all_expenses.filter(
+        status='approved',
+        approved_at__date=today
+    ).count()
+    
+    # Serialize recent approvals
+    recent_approvals_serializer = ExpenseSerializer(recent_approvals, many=True)
+    
+    return Response({
+        'pending_count': pending_count,
+        'approved_count': approved_count,
+        'rejected_count': rejected_count,
+        'team_members_count': team_members,
+        'today_approvals': today_approvals,
+        'recent_approvals': recent_approvals_serializer.data,
+        'total_expenses': all_expenses.count()
+    }, status=status.HTTP_200_OK)

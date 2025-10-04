@@ -29,4 +29,11 @@ urlpatterns = [
     path('receipts/ocr/', views.process_receipt_ocr, name='process-receipt-ocr'),
     path('countries-currencies/', views.get_countries_currencies, name='countries-currencies'),
     path('exchange-rates/', views.get_exchange_rates, name='exchange-rates'),
+    
+    # Expense Approval endpoints
+    path('pending-approvals/', views.get_pending_approvals, name='pending-approvals'),
+    path('expenses/<int:expense_id>/approve/', views.approve_expense, name='approve-expense'),
+    path('expenses/<int:expense_id>/reject/', views.reject_expense, name='reject-expense'),
+    path('my-expenses/', views.get_my_expenses, name='my-expenses'),
+    path('manager-dashboard/', views.get_manager_dashboard_data, name='manager-dashboard'),
 ]

@@ -410,6 +410,71 @@ class ApiService {
 
     return true;
   }
+
+  // Expense Approval APIs
+  async getPendingApprovals(): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/pending-approvals/`, {
+        method: 'GET',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching pending approvals:', error);
+      throw error;
+    }
+  }
+
+  async approveExpense(expenseId: number): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/expenses/${expenseId}/approve/`, {
+        method: 'POST',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error approving expense:', error);
+      throw error;
+    }
+  }
+
+  async rejectExpense(expenseId: number, rejectionReason: string): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/expenses/${expenseId}/reject/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ rejection_reason: rejectionReason }),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error rejecting expense:', error);
+      throw error;
+    }
+  }
+
+  async getMyExpenses(): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/my-expenses/`, {
+        method: 'GET',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching my expenses:', error);
+      throw error;
+    }
+  }
+
+  async getManagerDashboardData(): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/manager-dashboard/`, {
+        method: 'GET',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching manager dashboard data:', error);
+      throw error;
+    }
+  }
 }
 
 export const apiService = new ApiService();

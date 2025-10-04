@@ -16,6 +16,7 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { Routes, Route } from "react-router-dom";
 import ExpenseSubmission from "./ExpenseSubmission";
+import EmployeeExpenses from "./EmployeeExpenses";
 
 const navItems = [
   { label: "Dashboard", path: "/employee", icon: LayoutDashboard },
@@ -121,7 +122,7 @@ const EmployeeDashboard = () => {
       <Routes>
         <Route path="/" element={<EmployeeOverview />} />
         <Route path="/submit" element={<ExpenseSubmission />} />
-        <Route path="/history" element={<div>Expense History - Coming Soon</div>} />
+        <Route path="/history" element={<EmployeeExpenses />} />
         <Route path="/profile" element={<div>Profile - Coming Soon</div>} />
       </Routes>
     </DashboardLayout>
