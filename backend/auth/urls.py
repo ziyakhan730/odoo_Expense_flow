@@ -38,4 +38,17 @@ urlpatterns = [
     path('manager-dashboard/', views.get_manager_dashboard_data, name='manager-dashboard'),
     path('manager-history/', views.get_manager_approval_history, name='manager-history'),
     path('admin-dashboard/', views.get_admin_dashboard_data, name='admin-dashboard'),
+    
+    # Workflow API endpoints
+    path('expenses/submit/', views.submit_expense, name='submit-expense'),
+    path('expenses/pending/', views.get_pending_approvals_workflow, name='pending-approvals-workflow'),
+    path('expenses/<int:expense_id>/approve-workflow/', views.approve_expense_workflow, name='approve-expense-workflow'),
+    path('expenses/<int:expense_id>/reject-workflow/', views.reject_expense_workflow, name='reject-expense-workflow'),
+    path('expenses/<int:expense_id>/override/', views.admin_override_expense, name='admin-override-expense'),
+    path('expenses/history/', views.get_expense_history, name='expense-history'),
+    path('approval-rules/', views.get_approval_rules, name='approval-rules'),
+    path('approval-rules/create/', views.create_approval_rule, name='create-approval-rule'),
+    path('approval-rules/<int:rule_id>/', views.approval_rule_detail, name='approval-rule-detail'),
+    path('approval-rules/setup-default/', views.setup_default_rules, name='setup-default-rules'),
+    path('escalations/check/', views.check_escalations_view, name='check-escalations'),
 ]

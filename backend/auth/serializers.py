@@ -3,7 +3,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
 from django.db import transaction
-from .models import User, Company, UserSet, Expense, ExpenseCategory, Receipt
+from .models import User, Company, UserSet, Expense, ExpenseCategory, Receipt, ApprovalRule, ApprovalRecord
 
 
 class CompanySerializer(serializers.ModelSerializer):
@@ -374,3 +374,108 @@ class OCRDataSerializer(serializers.Serializer):
     confidence = serializers.FloatField()
     extracted_data = serializers.JSONField()
     merchant_info = serializers.JSONField(required=False)
+
+
+class ApprovalRuleSerializer(serializers.ModelSerializer):
+    """Serializer for ApprovalRule model"""
+    
+    class Meta:
+        model = ApprovalRule
+        fields = ['id', 'name', 'min_amount', 'max_amount', 'sequence', 'percentage_required', 
+                 'admin_override', 'urgent_bypass', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
+
+class ApprovalRecordSerializer(serializers.ModelSerializer):
+    """Serializer for ApprovalRecord model"""
+    approver_name = serializers.CharField(source='approver.get_full_name', read_only=True)
+    approver_username = serializers.CharField(source='approver.username', read_only=True)
+    
+    class Meta:
+        model = ApprovalRecord
+        fields = ['id', 'expense', 'approver', 'approver_name', 'approver_username', 'role', 
+                 'status', 'comment', 'approved_at', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class WorkflowExpenseSerializer(serializers.ModelSerializer):
+    """Enhanced Expense serializer for workflow"""
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    user_username = serializers.CharField(source='user.username', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    approval_records = ApprovalRecordSerializer(many=True, read_only=True)
+    approval_rule_name = serializers.CharField(source='approval_rule.name', read_only=True)
+    next_approver = serializers.SerializerMethodField()
+    approval_percentage = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Expense
+        fields = ['id', 'title', 'description', 'amount', 'currency', 'converted_amount', 
+                 'expense_date', 'submission_date', 'status', 'priority', 'urgent', 
+                 'current_stage', 'escalation_date', 'escalated', 'user_name', 'user_username',
+                 'category_name', 'approval_records', 'approval_rule_name', 'next_approver',
+                 'approval_percentage', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at']
+    
+    def get_next_approver(self, obj):
+        """Get the next approver for the expense"""
+        from .workflow import get_next_approver
+        return get_next_approver(obj, obj.current_stage)
+    
+    def get_approval_percentage(self, obj):
+        """Get approval percentage for the expense"""
+        from .workflow import calculate_approval_percentage
+        return calculate_approval_percentage(obj)
+
+
+class ExpenseSubmissionSerializer(serializers.ModelSerializer):
+    """Serializer for expense submission with workflow"""
+    
+    class Meta:
+        model = Expense
+        fields = ['title', 'description', 'amount', 'currency', 'expense_date', 
+                 'category', 'priority', 'urgent', 'tags', 'notes']
+    
+    def create(self, validated_data):
+        """Create expense with workflow setup"""
+        from .workflow import convert_currency, get_applicable_rule, setup_escalation
+        
+        user = self.context['request'].user
+        validated_data['user'] = user
+        validated_data['company'] = user.company
+        
+        # Convert currency if needed
+        amount = validated_data['amount']
+        currency = validated_data['currency']
+        company_currency = 'USD'  # Default company currency
+        
+        if currency != company_currency:
+            converted_amount = convert_currency(amount, currency, company_currency)
+            validated_data['converted_amount'] = converted_amount
+        
+        # Get applicable rule
+        rule = get_applicable_rule(amount, user.company, validated_data.get('urgent', False))
+        if rule:
+            validated_data['approval_rule'] = rule
+            validated_data['current_stage'] = rule.sequence[0] if rule.sequence else 'manager'
+        
+        # Create expense
+        expense = super().create(validated_data)
+        
+        # Setup escalation
+        setup_escalation(expense)
+        
+        return expense
+
+
+class ApprovalActionSerializer(serializers.Serializer):
+    """Serializer for approval actions"""
+    action = serializers.ChoiceField(choices=['approve', 'reject', 'override'])
+    comment = serializers.CharField(required=False, allow_blank=True)
+    
+    def validate_action(self, value):
+        """Validate action based on user role"""
+        user = self.context['request'].user
+        if value == 'override' and user.role != 'admin':
+            raise serializers.ValidationError("Only admins can override")
+        return value

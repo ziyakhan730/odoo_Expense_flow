@@ -5,12 +5,18 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.contrib.auth import authenticate
 from django.db import transaction, models
-from .models import User, Company, UserSet, Expense, ExpenseCategory
+from .models import User, Company, UserSet, Expense, ExpenseCategory, ApprovalRule, ApprovalRecord
 from .serializers import (
     UserRegistrationSerializer, UserSerializer, LoginSerializer, CompanySerializer, 
     CustomTokenObtainPairSerializer, UserSetSerializer, UserSetCreateSerializer,
     UserCreateSerializer, UserRoleUpdateSerializer, UserSetUpdateSerializer , 
-    ExpenseSerializer, ExpenseCreateSerializer, ExpenseCategorySerializer
+    ExpenseSerializer, ExpenseCreateSerializer, ExpenseCategorySerializer,
+    ApprovalRuleSerializer, ApprovalRecordSerializer, WorkflowExpenseSerializer,
+    ExpenseSubmissionSerializer, ApprovalActionSerializer
+)
+from .workflow import (
+    convert_currency, get_applicable_rule, advance_workflow, admin_override,
+    setup_escalation, check_escalations, create_default_rules
 )
 
 
@@ -837,4 +843,269 @@ def get_manager_approval_history(request):
             'rejected': rejected_count,
             'pending': pending_count
         }
+    }, status=status.HTTP_200_OK)
+
+
+# Workflow API Views
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def submit_expense(request):
+    """
+    API endpoint for submitting expenses with workflow
+    """
+    serializer = ExpenseSubmissionSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        expense = serializer.save()
+        return Response({
+            'message': 'Expense submitted successfully',
+            'expense': WorkflowExpenseSerializer(expense).data
+        }, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_pending_approvals_workflow(request):
+    """
+    API endpoint for getting pending approvals with workflow details
+    """
+    user = request.user
+    
+    if user.role == 'manager':
+        # Get expenses from user's set
+        if not user.user_set:
+            return Response({'error': 'Manager not assigned to any set'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        expenses = Expense.objects.filter(
+            user__user_set=user.user_set,
+            status__in=['pending', 'in_progress'],
+            current_stage='manager'
+        ).order_by('-submission_date')
+    
+    elif user.role == 'admin':
+        # Get all expenses pending admin approval
+        expenses = Expense.objects.filter(
+            company=user.company,
+            status__in=['pending', 'in_progress'],
+            current_stage='admin'
+        ).order_by('-submission_date')
+    
+    else:
+        return Response({'error': 'Only managers and admins can view pending approvals'}, status=status.HTTP_403_FORBIDDEN)
+    
+    serializer = WorkflowExpenseSerializer(expenses, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def approve_expense_workflow(request, expense_id):
+    """
+    API endpoint for approving expenses with workflow
+    """
+    try:
+        expense = Expense.objects.get(id=expense_id, company=request.user.company)
+    except Expense.DoesNotExist:
+        return Response({'error': 'Expense not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if user can approve this expense
+    if request.user.role == 'manager':
+        if not request.user.user_set or expense.user.user_set != request.user.user_set:
+            return Response({'error': 'You can only approve expenses from your set'}, status=status.HTTP_403_FORBIDDEN)
+        if expense.current_stage != 'manager':
+            return Response({'error': 'Expense is not in manager approval stage'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.user.role == 'admin':
+        if expense.current_stage not in ['admin', 'manager']:
+            return Response({'error': 'Expense is not in admin approval stage'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    else:
+        return Response({'error': 'Only managers and admins can approve expenses'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Process approval
+    result = advance_workflow(expense, request.user, 'approved', request.data.get('comment', ''))
+    
+    return Response(result, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def reject_expense_workflow(request, expense_id):
+    """
+    API endpoint for rejecting expenses with workflow
+    """
+    try:
+        expense = Expense.objects.get(id=expense_id, company=request.user.company)
+    except Expense.DoesNotExist:
+        return Response({'error': 'Expense not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    # Check if user can reject this expense
+    if request.user.role == 'manager':
+        if not request.user.user_set or expense.user.user_set != request.user.user_set:
+            return Response({'error': 'You can only reject expenses from your set'}, status=status.HTTP_403_FORBIDDEN)
+        if expense.current_stage != 'manager':
+            return Response({'error': 'Expense is not in manager approval stage'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.user.role == 'admin':
+        if expense.current_stage not in ['admin', 'manager']:
+            return Response({'error': 'Expense is not in admin approval stage'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    else:
+        return Response({'error': 'Only managers and admins can reject expenses'}, status=status.HTTP_403_FORBIDDEN)
+    
+    # Process rejection
+    result = advance_workflow(expense, request.user, 'rejected', request.data.get('comment', ''))
+    
+    return Response(result, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def admin_override_expense(request, expense_id):
+    """
+    API endpoint for admin override functionality
+    """
+    if request.user.role != 'admin':
+        return Response({'error': 'Only admins can override'}, status=status.HTTP_403_FORBIDDEN)
+    
+    serializer = ApprovalActionSerializer(data=request.data, context={'request': request})
+    if serializer.is_valid():
+        action = serializer.validated_data['action']
+        comment = serializer.validated_data.get('comment', '')
+        
+        result = admin_override(expense_id, action, request.user, comment)
+        return Response(result, status=status.HTTP_200_OK)
+    
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_expense_history(request):
+    """
+    API endpoint for getting expense approval history
+    """
+    user = request.user
+    
+    if user.role == 'employee':
+        # Get user's own expenses
+        expenses = Expense.objects.filter(user=user).order_by('-submission_date')
+    elif user.role == 'manager':
+        # Get expenses from user's set
+        if not user.user_set:
+            return Response({'error': 'Manager not assigned to any set'}, status=status.HTTP_400_BAD_REQUEST)
+        expenses = Expense.objects.filter(user__user_set=user.user_set).order_by('-submission_date')
+    elif user.role == 'admin':
+        # Get all company expenses
+        expenses = Expense.objects.filter(company=user.company).order_by('-submission_date')
+    else:
+        return Response({'error': 'Invalid user role'}, status=status.HTTP_400_BAD_REQUEST)
+    
+    # Apply filters
+    status_filter = request.GET.get('status')
+    if status_filter:
+        expenses = expenses.filter(status=status_filter)
+    
+    date_from = request.GET.get('date_from')
+    if date_from:
+        expenses = expenses.filter(submission_date__date__gte=date_from)
+    
+    date_to = request.GET.get('date_to')
+    if date_to:
+        expenses = expenses.filter(submission_date__date__lte=date_to)
+    
+    serializer = WorkflowExpenseSerializer(expenses, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_approval_rules(request):
+    """
+    API endpoint for getting approval rules
+    """
+    if request.user.role != 'admin':
+        return Response({'error': 'Only admins can view approval rules'}, status=status.HTTP_403_FORBIDDEN)
+    
+    rules = ApprovalRule.objects.filter(company=request.user.company, is_active=True)
+    serializer = ApprovalRuleSerializer(rules, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def create_approval_rule(request):
+    """
+    API endpoint for creating approval rules
+    """
+    if request.user.role != 'admin':
+        return Response({'error': 'Only admins can create approval rules'}, status=status.HTTP_403_FORBIDDEN)
+    
+    serializer = ApprovalRuleSerializer(data=request.data)
+    if serializer.is_valid():
+        serializer.save(company=request.user.company)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([permissions.IsAuthenticated])
+def approval_rule_detail(request, rule_id):
+    """
+    API endpoint for retrieving, updating, and deleting approval rules
+    """
+    if request.user.role != 'admin':
+        return Response({'error': 'Only admins can manage approval rules'}, status=status.HTTP_403_FORBIDDEN)
+    
+    try:
+        rule = ApprovalRule.objects.get(id=rule_id, company=request.user.company)
+    except ApprovalRule.DoesNotExist:
+        return Response({'error': 'Approval rule not found'}, status=status.HTTP_404_NOT_FOUND)
+    
+    if request.method == 'GET':
+        serializer = ApprovalRuleSerializer(rule)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+    
+    elif request.method == 'PUT':
+        serializer = ApprovalRuleSerializer(rule, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    elif request.method == 'DELETE':
+        rule.delete()
+        return Response({'message': 'Approval rule deleted successfully'}, status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def setup_default_rules(request):
+    """
+    API endpoint for setting up default approval rules
+    """
+    if request.user.role != 'admin':
+        return Response({'error': 'Only admins can setup default rules'}, status=status.HTTP_403_FORBIDDEN)
+    
+    success = create_default_rules(request.user.company)
+    if success:
+        return Response({'message': 'Default approval rules created successfully'}, status=status.HTTP_200_OK)
+    else:
+        return Response({'error': 'Failed to create default rules'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def check_escalations_view(request):
+    """
+    API endpoint for checking escalations (can be called by cron job)
+    """
+    if request.user.role != 'admin':
+        return Response({'error': 'Only admins can check escalations'}, status=status.HTTP_403_FORBIDDEN)
+    
+    escalated_count = check_escalations()
+    return Response({
+        'message': f'{escalated_count} expenses escalated',
+        'escalated_count': escalated_count
     }, status=status.HTTP_200_OK)

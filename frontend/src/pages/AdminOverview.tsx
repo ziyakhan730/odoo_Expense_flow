@@ -23,7 +23,8 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  Eye
+  Eye,
+  Settings
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -429,85 +430,40 @@ const AdminOverview = () => {
         </CardContent>
       </Card>
 
-      {/* Approval Rules */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Approval Rules</CardTitle>
-            <CardDescription>Define conditional approval workflows</CardDescription>
-          </div>
-          <Dialog open={showAddRule} onOpenChange={setShowAddRule}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Rule
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create Approval Rule</DialogTitle>
-                <DialogDescription>Set conditions and required approvers</DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleAddRule} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="rule-condition">Condition Type</Label>
-                  <Select required>
-                    <SelectTrigger id="rule-condition">
-                      <SelectValue placeholder="Select condition" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="amount">Amount</SelectItem>
-                      <SelectItem value="category">Category</SelectItem>
-                      <SelectItem value="department">Department</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="rule-value">Value</Label>
-                  <Input id="rule-value" placeholder="e.g., > 5000 or Travel" required />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="rule-action">Required Approver</Label>
-                  <Select required>
-                    <SelectTrigger id="rule-action">
-                      <SelectValue placeholder="Select approver" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manager">Manager</SelectItem>
-                      <SelectItem value="cfo">CFO</SelectItem>
-                      <SelectItem value="hr">HR</SelectItem>
-                      <SelectItem value="board">Board</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button type="submit" className="w-full">Create Rule</Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {mockRules.map((rule) => (
-              <div
-                key={rule.id}
-                className="flex items-center justify-between p-4 rounded-lg border-2 border-border"
+        {/* Approval Rules */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Approval Rules</CardTitle>
+              <CardDescription>Manage expense approval workflows and thresholds</CardDescription>
+            </div>
+            <Button 
+              variant="outline"
+              onClick={() => window.location.href = '/admin/rules'}
+            >
+              {/* FIX: Import the Settings icon at the top of the file */}
+              {/* If not already imported, add: import { Settings } from "lucide-react"; */}
+              <Settings className="h-4 w-4 mr-2" />
+              Manage Rules
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8">
+              <Settings className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-semibold mb-2">Approval Rules Management</h3>
+              <p className="text-muted-foreground mb-4">
+                Create and manage approval workflows based on expense amounts and conditions.
+              </p>
+              <Button 
+                onClick={() => window.location.href = '/admin/rules'}
+                className="w-full"
               >
-                <div className="flex-1">
-                  <p className="font-medium text-sm">
-                    <span className="text-primary">IF</span> {rule.condition}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    <span className="text-secondary">THEN</span> {rule.action}
-                  </p>
-                </div>
-                <Button variant="ghost" size="icon">
-                  <Trash2 className="h-4 w-4 text-destructive" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+                <Settings className="h-4 w-4 mr-2" />
+                Go to Rules Management
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
       {/* User Details Dialog */}
       <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>

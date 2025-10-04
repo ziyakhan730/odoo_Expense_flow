@@ -145,6 +145,15 @@ class Expense(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
     
+    # Workflow fields
+    urgent = models.BooleanField(default=False)
+    current_stage = models.CharField(max_length=20, default='manager', help_text="Current approval stage")
+    approval_rule = models.ForeignKey('ApprovalRule', on_delete=models.SET_NULL, null=True, blank=True)
+    
+    # Auto-escalation fields
+    escalation_date = models.DateTimeField(null=True, blank=True, help_text="When to escalate if not approved")
+    escalated = models.BooleanField(default=False)
+    
     # Approval Information
     approved_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='approved_expenses')
     approved_at = models.DateTimeField(null=True, blank=True)
@@ -202,3 +211,48 @@ class Receipt(models.Model):
     class Meta:
         verbose_name = "Receipt"
         verbose_name_plural = "Receipts"
+
+
+class ApprovalRule(models.Model):
+    """Approval rule model for defining approval workflows"""
+    name = models.CharField(max_length=200)
+    min_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    max_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    sequence = models.JSONField(help_text="List of approval roles in sequence")
+    percentage_required = models.IntegerField(default=100, help_text="Percentage of approvers required")
+    admin_override = models.BooleanField(default=True)
+    urgent_bypass = models.BooleanField(default=True, help_text="Skip manager for urgent expenses")
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, related_name='approval_rules')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.min_amount}-{self.max_amount or '∞'})"
+
+    class Meta:
+        ordering = ['min_amount']
+
+
+class ApprovalRecord(models.Model):
+    """Approval record model for tracking approval history"""
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+        ('overridden', 'Overridden'),
+    ]
+    
+    expense = models.ForeignKey(Expense, on_delete=models.CASCADE, related_name='approval_records')
+    approver = models.ForeignKey(User, on_delete=models.CASCADE, related_name='approval_records')
+    role = models.CharField(max_length=20, choices=User.ROLE_CHOICES)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    comment = models.TextField(blank=True, null=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.approver.username} - {self.expense.title} - {self.status}"
+
+    class Meta:
+        ordering = ['-created_at']

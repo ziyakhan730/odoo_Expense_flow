@@ -2,6 +2,7 @@ import { Routes, Route } from "react-router-dom";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import UserManagement from "./UserManagement";
 import AdminOverview from "./AdminOverview";
+import AdminRules from "./AdminRules";
 import ExpenseCategories from "./ExpenseCategories";
 import { 
   LayoutDashboard, 
@@ -26,7 +27,7 @@ const AdminDashboard = () => {
         <Route path="/" element={<AdminOverview />} />
         <Route path="/users" element={<UserManagement />} />
         <Route path="/categories" element={<ExpenseCategories />} />
-        <Route path="/rules" element={<div>Rules Management - Coming Soon</div>} />
+        <Route path="/rules" element={<AdminRules />} />
         <Route path="/analytics" element={<div>Analytics - Coming Soon</div>} />
       </Routes>
     </DashboardLayout>

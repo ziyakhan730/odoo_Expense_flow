@@ -532,6 +532,75 @@ class ApiService {
       throw error;
     }
   }
+
+  // Approval Rules Management
+  async getApprovalRules(): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/approval-rules/`, {
+        method: 'GET',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching approval rules:', error);
+      throw error;
+    }
+  }
+
+  async createApprovalRule(ruleData: any): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/approval-rules/create/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(ruleData),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error creating approval rule:', error);
+      throw error;
+    }
+  }
+
+  async updateApprovalRule(ruleId: number, ruleData: any): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/approval-rules/${ruleId}/`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(ruleData),
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error updating approval rule:', error);
+      throw error;
+    }
+  }
+
+  async deleteApprovalRule(ruleId: number): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/approval-rules/${ruleId}/`, {
+        method: 'DELETE',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error deleting approval rule:', error);
+      throw error;
+    }
+  }
+
+  async setupDefaultRules(): Promise<any> {
+    try {
+      const response = await this.makeAuthenticatedRequest(`${API_BASE_URL}/auth/approval-rules/setup-default/`, {
+        method: 'POST',
+      });
+      return await response.json();
+    } catch (error) {
+      console.error('Error setting up default rules:', error);
+      throw error;
+    }
+  }
 }
 
 export const apiService = new ApiService();
